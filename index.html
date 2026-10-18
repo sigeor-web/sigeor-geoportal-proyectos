@@ -227,10 +227,21 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #f4f7fb; }
       </div>
     </div>
 
+    <div class="chart-row">
+      <div class="chart-card">
+        <div class="chart-title">Top 10 Proyectistas</div>
+        <div class="chart-wrap"><canvas id="chart-proyectista"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Top 10 Subestaciones (codi_sub)</div>
+        <div class="chart-wrap"><canvas id="chart-subestacion"></canvas></div>
+      </div>
+    </div>
+
     <div class="top-table-wrap">
-      <div class="chart-title">Top 15 Propietarios</div>
-      <table class="top-table" id="tbl-propietario">
-        <thead><tr><th>#</th><th>Propietario</th><th>Proyectos</th></tr></thead>
+      <div class="chart-title">Top 20 Alimentadores con más proyectos</div>
+      <table class="top-table" id="tbl-alimentador">
+        <thead><tr><th>#</th><th>Alimentador</th><th>Proyectos</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -259,7 +270,7 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #f4f7fb; }
 // ── Config ──────────────────────────────────────────────────
 const SUPABASE_URL = 'https://vkegcorcdiuujtwwlrqd.supabase.co';
 const ANON_KEY     = 'sb_publishable_vtdZvw10DWikrZYPpCu2HQ_OGihcKO_';
-const CAMPOS = 'id_pro,geom,codigo,nombre,servicio,propietario,fiscalizador,proyectista,fecha_r';
+const CAMPOS = 'id_pro,geom,codigo,nombre,servicio,propietario,fiscalizador,proyectista,fecha_r,codi_alim,nom_alim,codi_sub';
 const SKIP_FIELDS = ['geom','geometry','wkb_geometry','the_geom','shape','coord_x','coord_y'];
 
 // ── State ────────────────────────────────────────────────────
@@ -406,27 +417,30 @@ function buildDashboard(rows) {
   if (chartsBuilt) return;
   chartsBuilt = true;
 
-  // KPIs
-  const servicios = groupBy(rows, 'servicio');
-  const propietarios = groupBy(rows, 'propietario');
-  const anios = groupBy(rows, r => r.fecha_r ? r.fecha_r.slice(0,4) : 'Sin fecha');
-  const sinGeo = rows.filter(r => !r.geom || !r.geom.coordinates).length;
+  const servicios    = groupBy(rows, 'servicio');
+  const proyectistas = groupBy(rows, 'proyectista');
+  const subestaciones= groupBy(rows, 'codi_sub');
+  const alimentadores= groupBy(rows, r => r.nom_alim ? `${r.codi_alim||''} · ${r.nom_alim}` : (r.codi_alim||''));
+  const anios        = groupBy(rows, r => r.fecha_r ? r.fecha_r.slice(0,4) : '');
+  const sinGeo       = rows.filter(r => !r.geom || !r.geom.coordinates).length;
 
+  // ── KPIs ────────────────────────────────────────────────────
   const kpis = [
-    { label: 'Total proyectos',   val: rows.length.toLocaleString(), sub: 'en la base' },
-    { label: 'Servicios únicos',  val: Object.keys(servicios).length, sub: 'tipos de servicio' },
-    { label: 'Propietarios',      val: Object.keys(propietarios).length, sub: 'únicos' },
-    { label: 'Con georreferencia',val: (rows.length - sinGeo).toLocaleString(), sub: `${sinGeo} sin coords` },
+    { label: 'Total proyectos',    val: rows.length.toLocaleString(),              sub: 'en la base',           color: '#00a651' },
+    { label: 'Proyectistas',       val: Object.keys(proyectistas).length,          sub: 'profesionales únicos', color: '#003d6b' },
+    { label: 'Subestaciones',      val: Object.keys(subestaciones).filter(Boolean).length, sub: 'con proyectos', color: '#0077c8' },
+    { label: 'Alimentadores',      val: Object.keys(alimentadores).filter(Boolean).length, sub: 'con proyectos', color: '#e67e22' },
+    { label: 'Servicios únicos',   val: Object.keys(servicios).length,             sub: 'tipos de servicio',    color: '#8e44ad' },
+    { label: 'Con georreferencia', val: (rows.length - sinGeo).toLocaleString(),   sub: `${sinGeo} sin coords`, color: '#27ae60' },
   ];
-  const colors = ['#00a651','#003d6b','#0077c8','#e67e22'];
-  document.getElementById('kpi-row').innerHTML = kpis.map((k,i) => `
-    <div class="kpi-card" style="border-left-color:${colors[i]}">
+  document.getElementById('kpi-row').innerHTML = kpis.map(k => `
+    <div class="kpi-card" style="border-left-color:${k.color}">
       <div class="kpi-label">${k.label}</div>
       <div class="kpi-val">${k.val}</div>
       <div class="kpi-sub">${k.sub}</div>
     </div>`).join('');
 
-  // Chart: Proyectos por servicio
+  // ── Chart: por servicio ──────────────────────────────────────
   const srvSorted = Object.entries(servicios).sort((a,b) => b[1]-a[1]).slice(0,12);
   new Chart(document.getElementById('chart-servicio'), {
     type: 'bar',
@@ -438,14 +452,12 @@ function buildDashboard(rows) {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { font: { size: 10 }, maxRotation: 45 } },
-        y: { beginAtZero: true, ticks: { precision: 0 } }
-      }
+      scales: { x: { ticks: { font: { size: 10 }, maxRotation: 45 } },
+                y: { beginAtZero: true, ticks: { precision: 0 } } }
     }
   });
 
-  // Chart: por año
+  // ── Chart: por año ───────────────────────────────────────────
   const anioSorted = Object.entries(anios)
     .filter(([k]) => /^\d{4}$/.test(k))
     .sort(([a],[b]) => a.localeCompare(b));
@@ -456,8 +468,7 @@ function buildDashboard(rows) {
       datasets: [{
         label: 'Proyectos', data: anioSorted.map(([,v]) => v),
         borderColor: '#003d6b', backgroundColor: 'rgba(0,61,107,.12)',
-        fill: true, tension: 0.3, pointRadius: 4,
-        pointBackgroundColor: '#003d6b'
+        fill: true, tension: 0.3, pointRadius: 4, pointBackgroundColor: '#003d6b'
       }]
     },
     options: {
@@ -467,23 +478,81 @@ function buildDashboard(rows) {
     }
   });
 
-  // Table: top propietarios
-  const propSorted = Object.entries(propietarios).sort((a,b) => b[1]-a[1]).slice(0,15);
-  const maxP = propSorted[0]?.[1] || 1;
-  document.querySelector('#tbl-propietario tbody').innerHTML =
-    propSorted.map(([k,v],i) => `<tr>
-      <td>${i+1}</td>
-      <td><span class="bar-mini" style="width:${Math.round(v/maxP*80)}px"></span>${k||'(sin dato)'}</td>
-      <td>${v}</td>
-    </tr>`).join('');
+  // ── Chart: Top 10 Proyectistas (horizontal bar) ──────────────
+  const proySorted = Object.entries(proyectistas)
+    .filter(([k]) => k)
+    .sort((a,b) => b[1]-a[1]).slice(0,10);
+  new Chart(document.getElementById('chart-proyectista'), {
+    type: 'bar',
+    data: {
+      labels: proySorted.map(([k]) => k),
+      datasets: [{ label: 'Proyectos', data: proySorted.map(([,v]) => v),
+        backgroundColor: '#0077c8', borderRadius: 4 }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, ticks: { precision: 0 } },
+        y: { ticks: { font: { size: 10 } } }
+      }
+    }
+  });
 
-  // Table: top fiscalizadores
-  const fiscSorted = Object.entries(groupBy(rows,'fiscalizador')).sort((a,b)=>b[1]-a[1]).slice(0,15);
+  // ── Chart: Top 10 Subestaciones (horizontal bar) ─────────────
+  const subSorted = Object.entries(subestaciones)
+    .filter(([k]) => k)
+    .sort((a,b) => b[1]-a[1]).slice(0,10);
+  if (subSorted.length > 0) {
+    new Chart(document.getElementById('chart-subestacion'), {
+      type: 'bar',
+      data: {
+        labels: subSorted.map(([k]) => k),
+        datasets: [{ label: 'Proyectos', data: subSorted.map(([,v]) => v),
+          backgroundColor: '#e67e22', borderRadius: 4 }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { beginAtZero: true, ticks: { precision: 0 } },
+          y: { ticks: { font: { size: 10 } } }
+        }
+      }
+    });
+  } else {
+    document.getElementById('chart-subestacion').closest('.chart-card')
+      .querySelector('.chart-title').insertAdjacentHTML('afterend',
+        '<p style="color:#999;font-size:12px;margin-top:8px;">Campo "subestacion" no encontrado en los datos.</p>');
+  }
+
+  // ── Table: Top 20 Alimentadores ──────────────────────────────
+  const alimSorted = Object.entries(alimentadores)
+    .filter(([k]) => k)
+    .sort((a,b) => b[1]-a[1]).slice(0,20);
+  const maxA = alimSorted[0]?.[1] || 1;
+  if (alimSorted.length > 0) {
+    document.querySelector('#tbl-alimentador tbody').innerHTML =
+      alimSorted.map(([k,v],i) => `<tr>
+        <td>${i+1}</td>
+        <td><span class="bar-mini" style="width:${Math.round(v/maxA*100)}px"></span>${k}</td>
+        <td>${v}</td>
+      </tr>`).join('');
+  } else {
+    document.querySelector('#tbl-alimentador tbody').innerHTML =
+      '<tr><td colspan="3" style="text-align:center;color:#999;padding:14px">Campo "alimentador" no encontrado en los datos.</td></tr>';
+  }
+
+  // ── Table: Top 15 Fiscalizadores ─────────────────────────────
+  const fiscSorted = Object.entries(groupBy(rows,'fiscalizador'))
+    .filter(([k]) => k).sort((a,b) => b[1]-a[1]).slice(0,15);
   const maxF = fiscSorted[0]?.[1] || 1;
   document.querySelector('#tbl-fiscalizador tbody').innerHTML =
     fiscSorted.map(([k,v],i) => `<tr>
       <td>${i+1}</td>
-      <td><span class="bar-mini" style="width:${Math.round(v/maxF*80)}px"></span>${k||'(sin dato)'}</td>
+      <td><span class="bar-mini" style="width:${Math.round(v/maxF*100)}px"></span>${k||'(sin dato)'}</td>
       <td>${v}</td>
     </tr>`).join('');
 }
