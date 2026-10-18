@@ -149,22 +149,33 @@ const cluster = L.markerClusterGroup({ chunkedLoading: true, spiderfyOnMaxZoom: 
 const CAMPOS = 'id_pro,geom,codigo,nombre,servicio,propietario,fiscalizador,proyectista,fecha_r';
 fetch(`${SUPABASE_URL}/rest/v1/proyectos?select=${CAMPOS}`, {
   headers: {
-    'apikey':         ANON_KEY,
-    'Authorization':  `Bearer ${ANON_KEY}`,
-    'Accept':         'application/geo+json'
+    'apikey':        ANON_KEY,
+    'Authorization': `Bearer ${ANON_KEY}`
   }
 })
 .then(res => {
   if (!res.ok) throw new Error(`Supabase respondió ${res.status}`);
   return res.json();
 })
-.then(geojson => {
+.then(rows => {
   document.getElementById('loader').style.display = 'none';
 
-  const n = geojson.features ? geojson.features.length : 0;
+  const n = rows.length;
   const el = document.getElementById('count');
   el.textContent = `${n.toLocaleString()} proyectos`;
   el.style.display = 'block';
+
+  // Construir GeoJSON limpio (sin crs) desde el JSON plano
+  const geojson = {
+    type: 'FeatureCollection',
+    features: rows
+      .filter(r => r.geom && r.geom.coordinates)
+      .map(r => ({
+        type: 'Feature',
+        geometry: { type: r.geom.type, coordinates: r.geom.coordinates },
+        properties: Object.fromEntries(Object.entries(r).filter(([k]) => k !== 'geom'))
+      }))
+  };
 
   const layer = L.geoJSON(geojson, {
     pointToLayer: (f, ll) => L.circleMarker(ll, circleStyle()),
