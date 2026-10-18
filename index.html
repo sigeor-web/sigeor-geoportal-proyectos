@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Geoportal SIGEOR</title>
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+<!-- MarkerCluster -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body { font-family: system-ui, -apple-system, sans-serif; }
+
+/* ── Header ── */
+#header {
+  position: fixed; top: 0; left: 0; right: 0; height: 52px;
+  background: #003d6b; color: #fff;
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 18px; z-index: 1000;
+  box-shadow: 0 2px 10px rgba(0,0,0,.35);
+}
+#header .brand { font-size: 17px; font-weight: 700; letter-spacing: .5px; color: #00c75a; }
+#header .sub   { font-size: 12px; opacity: .75; }
+#count {
+  margin-left: auto; background: #00a651; color: #fff;
+  padding: 3px 11px; border-radius: 20px; font-size: 12px; font-weight: 600;
+}
+
+/* ── Map ── */
+#map { position: fixed; top: 52px; left: 0; right: 0; bottom: 0; }
+
+/* ── Loader ── */
+#loader {
+  position: fixed; top: 52px; left: 0; right: 0; bottom: 0;
+  background: rgba(0,30,60,.82); z-index: 900;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: #fff; gap: 14px; font-size: 14px;
+}
+.spinner {
+  width: 38px; height: 38px;
+  border: 3px solid rgba(255,255,255,.25);
+  border-top-color: #00c75a; border-radius: 50%;
+  animation: spin .75s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Error toast ── */
+#err-toast {
+  display: none; position: fixed; bottom: 22px; left: 50%;
+  transform: translateX(-50%); z-index: 1001;
+  background: #c0392b; color: #fff;
+  padding: 10px 20px; border-radius: 6px; font-size: 13px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.3);
+}
+
+/* ── Popup ── */
+.pup-title { font-weight: 700; color: #003d6b; font-size: 13px; margin-bottom: 6px; }
+.pup-table { border-collapse: collapse; width: 100%; font-size: 11.5px; }
+.pup-table tr:nth-child(even) td { background: #f0f5fa; }
+.pup-table td { padding: 3px 7px; vertical-align: top; }
+.pup-table td:first-child { font-weight: 600; color: #334; white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <span class="brand">SIGEOR</span>
+  <span class="sub">Geoportal de Proyectos · CNEL EP</span>
+  <span id="count" style="display:none"></span>
+</div>
+
+<div id="map"></div>
+
+<div id="loader">
+  <div class="spinner"></div>
+  <span>Cargando proyectos…</span>
+</div>
+
+<div id="err-toast"></div>
+
+<script>
+// ── Configuración ───────────────────────────────────────────
+const SUPABASE_URL = 'https://vkegcorcdiuujtwwlrqd.supabase.co';
+const ANON_KEY     = 'sb_publishable_vtdZvw10DWikrZYPpCu2HQ_OGihcKO_';
+
+// Campos a OCULTAR en el popup
+const SKIP_FIELDS  = ['geom', 'geometry', 'wkb_geometry', 'the_geom', 'shape', 'coord_x', 'coord_y'];
+
+// ── Mapa (centro Ecuador) ───────────────────────────────────
+const map = L.map('map', { zoomControl: true }).setView([-1.8, -78.2], 7);
+
+const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
+  maxZoom: 19
+});
+const sat = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  { attribution: '© Esri, DigitalGlobe' }
+);
+osm.addTo(map);
+L.control.layers({ 'Mapa base': osm, 'Satélite': sat }, {}, { position: 'topright' }).addTo(map);
+
+// ── Estilo de marcadores ────────────────────────────────────
+function circleStyle() {
+  return {
+    radius: 6,
+    fillColor: '#00a651',
+    color: '#003d6b',
+    weight: 1.5,
+    opacity: 1,
+    fillOpacity: .85
+  };
+}
+
+function polyStyle() {
+  return { color: '#003d6b', weight: 1.5, fillColor: '#00a651', fillOpacity: .4 };
+}
+
+// ── Popup ───────────────────────────────────────────────────
+function buildPopup(props) {
+  const entries = Object.entries(props)
+    .filter(([k, v]) => !SKIP_FIELDS.includes(k.toLowerCase()) && v != null && v !== '');
+
+  // Intentar detectar un campo de nombre/título
+  const nameKey = ['nombre','name','proyecto','descripcion','titulo','id']
+    .find(k => props[k] != null);
+  const title = nameKey ? `<div class="pup-title">${props[nameKey]}</div>` : '';
+
+  const rows = entries
+    .map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`)
+    .join('');
+
+  return `${title}<div style="max-height:180px;overflow-y:auto">
+    <table class="pup-table">${rows}</table></div>`;
+}
+
+// ── Cluster ─────────────────────────────────────────────────
+const cluster = L.markerClusterGroup({ chunkedLoading: true, spiderfyOnMaxZoom: true });
+
+// ── Fetch Supabase (GeoJSON nativo) ─────────────────────────
+const CAMPOS = 'id_pro,geom,codigo,nombre,servicio,propietario,fiscalizador,proyectista,fecha_r';
+fetch(`${SUPABASE_URL}/rest/v1/proyectos?select=${CAMPOS}`, {
+  headers: {
+    'apikey':        ANON_KEY,
+    'Authorization': `Bearer ${ANON_KEY}`
+  }
+})
+.then(res => {
+  if (!res.ok) throw new Error(`Supabase respondió ${res.status}`);
+  return res.json();
+})
+.then(rows => {
+  document.getElementById('loader').style.display = 'none';
+
+  const n = rows.length;
+  const el = document.getElementById('count');
+  el.textContent = `${n.toLocaleString()} proyectos`;
+  el.style.display = 'block';
+
+  // Construir GeoJSON limpio (sin crs) desde el JSON plano
+  const geojson = {
+    type: 'FeatureCollection',
+    features: rows
+      .filter(r => r.geom && r.geom.coordinates)
+      .map(r => ({
+        type: 'Feature',
+        geometry: { type: r.geom.type, coordinates: r.geom.coordinates },
+        properties: Object.fromEntries(Object.entries(r).filter(([k]) => k !== 'geom'))
+      }))
+  };
+
+  const layer = L.geoJSON(geojson, {
+    pointToLayer: (f, ll) => L.circleMarker(ll, circleStyle()),
+    style: polyStyle,
+    onEachFeature: (f, lyr) => {
+      if (f.properties) lyr.bindPopup(buildPopup(f.properties), { maxWidth: 300 });
+    }
+  });
+
+  cluster.addLayer(layer);
+  map.addLayer(cluster);
+
+  if (n > 0) map.fitBounds(cluster.getBounds(), { padding: [40, 40] });
+})
+.catch(err => {
+  document.getElementById('loader').style.display = 'none';
+  const toast = document.getElementById('err-toast');
+  toast.textContent = `Error: ${err.message}`;
+  toast.style.display = 'block';
+  console.error(err);
+});
+</script>
+</body>
+</html>
