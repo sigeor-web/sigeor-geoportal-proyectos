@@ -14,28 +14,136 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
 
+<!-- Chart.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: system-ui, -apple-system, sans-serif; background: #f4f7fb; }
 
-body { font-family: system-ui, -apple-system, sans-serif; }
-
-/* ── Header ── */
-#header {
+/* ── Navbar ── */
+#navbar {
   position: fixed; top: 0; left: 0; right: 0; height: 52px;
   background: #003d6b; color: #fff;
-  display: flex; align-items: center; gap: 12px;
-  padding: 0 18px; z-index: 1000;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 14px; z-index: 1100;
   box-shadow: 0 2px 10px rgba(0,0,0,.35);
 }
-#header .brand { font-size: 17px; font-weight: 700; letter-spacing: .5px; color: #00c75a; }
-#header .sub   { font-size: 12px; opacity: .75; }
+.brand { font-size: 16px; font-weight: 700; letter-spacing: .5px; color: #00c75a; white-space: nowrap; }
+.sub   { font-size: 11px; opacity: .7; white-space: nowrap; }
 #count {
-  margin-left: auto; background: #00a651; color: #fff;
-  padding: 3px 11px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  background: #00a651; color: #fff;
+  padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  white-space: nowrap;
 }
 
-/* ── Map ── */
+/* ── Nav tabs ── */
+.nav-tabs {
+  display: flex; gap: 4px; margin-left: 10px;
+}
+.nav-tab {
+  padding: 5px 14px; border-radius: 4px; font-size: 12px; font-weight: 600;
+  cursor: pointer; border: none; transition: background .15s;
+  color: rgba(255,255,255,.7); background: transparent;
+}
+.nav-tab.active { background: rgba(255,255,255,.18); color: #fff; }
+.nav-tab:hover:not(.active) { background: rgba(255,255,255,.1); color: #fff; }
+
+/* ── Search box ── */
+#search-wrap {
+  position: relative; margin-left: auto; display: flex; align-items: center;
+}
+#search-input {
+  width: 220px; padding: 6px 32px 6px 10px;
+  border: none; border-radius: 6px; font-size: 12px;
+  background: rgba(255,255,255,.15); color: #fff;
+  outline: none; transition: background .2s;
+}
+#search-input::placeholder { color: rgba(255,255,255,.5); }
+#search-input:focus { background: rgba(255,255,255,.25); }
+.search-icon {
+  position: absolute; right: 9px; top: 50%; transform: translateY(-50%);
+  font-size: 13px; opacity: .6; pointer-events: none;
+}
+#search-dropdown {
+  display: none; position: absolute; top: calc(100% + 6px); right: 0;
+  width: 320px; max-height: 280px; overflow-y: auto;
+  background: #fff; border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.25); z-index: 2000;
+}
+.sd-item {
+  padding: 9px 14px; cursor: pointer; border-bottom: 1px solid #eef2f7;
+  transition: background .12s;
+}
+.sd-item:last-child { border-bottom: none; }
+.sd-item:hover { background: #f0f5ff; }
+.sd-name { font-size: 12px; font-weight: 600; color: #1a2d4a; }
+.sd-meta { font-size: 11px; color: #667; margin-top: 2px; }
+.sd-empty { padding: 14px; text-align: center; color: #999; font-size: 12px; }
+
+/* ── Screens ── */
+.screen { display: none; }
+.screen.active { display: block; }
+
+/* ── Map screen ── */
 #map { position: fixed; top: 52px; left: 0; right: 0; bottom: 0; }
+
+/* ── Dashboard screen ── */
+#dashboard {
+  position: fixed; top: 52px; left: 0; right: 0; bottom: 0;
+  overflow-y: auto; background: #f0f4f9;
+  padding: 20px;
+}
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px; margin-bottom: 20px;
+}
+.kpi-card {
+  background: #fff; border-radius: 10px;
+  padding: 16px 18px;
+  box-shadow: 0 2px 8px rgba(0,61,107,.08);
+  border-left: 4px solid #00a651;
+}
+.kpi-label { font-size: 11px; color: #667; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+.kpi-val   { font-size: 28px; font-weight: 800; color: #003d6b; margin-top: 4px; }
+.kpi-sub   { font-size: 11px; color: #999; margin-top: 2px; }
+
+.chart-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 16px; margin-bottom: 20px;
+}
+.chart-card {
+  background: #fff; border-radius: 10px; padding: 18px;
+  box-shadow: 0 2px 8px rgba(0,61,107,.08);
+}
+.chart-title {
+  font-size: 13px; font-weight: 700; color: #003d6b; margin-bottom: 14px;
+}
+.chart-wrap { position: relative; height: 240px; }
+
+.top-table-wrap {
+  background: #fff; border-radius: 10px; padding: 18px;
+  box-shadow: 0 2px 8px rgba(0,61,107,.08); margin-bottom: 20px;
+}
+.top-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.top-table th {
+  background: #003d6b; color: #fff; padding: 8px 12px;
+  text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .4px;
+}
+.top-table th:last-child { text-align: right; }
+.top-table td { padding: 8px 12px; border-bottom: 1px solid #eef2f7; color: #334; }
+.top-table td:last-child { text-align: right; font-weight: 700; color: #003d6b; }
+.top-table tr:last-child td { border-bottom: none; }
+.top-table tr:nth-child(even) td { background: #f8fafc; }
+.bar-mini {
+  display: inline-block; height: 8px; background: #00a651;
+  border-radius: 4px; margin-right: 8px; vertical-align: middle;
+}
+.dash-footer {
+  text-align: center; font-size: 11px; color: #aaa; padding-bottom: 10px;
+}
 
 /* ── Loader ── */
 #loader {
@@ -55,7 +163,7 @@ body { font-family: system-ui, -apple-system, sans-serif; }
 /* ── Error toast ── */
 #err-toast {
   display: none; position: fixed; bottom: 22px; left: 50%;
-  transform: translateX(-50%); z-index: 1001;
+  transform: translateX(-50%); z-index: 1200;
   background: #c0392b; color: #fff;
   padding: 10px 20px; border-radius: 6px; font-size: 13px;
   box-shadow: 0 4px 14px rgba(0,0,0,.3);
@@ -67,18 +175,79 @@ body { font-family: system-ui, -apple-system, sans-serif; }
 .pup-table tr:nth-child(even) td { background: #f0f5fa; }
 .pup-table td { padding: 3px 7px; vertical-align: top; }
 .pup-table td:first-child { font-weight: 600; color: #334; white-space: nowrap; }
+
+@media (max-width: 500px) {
+  .sub { display: none; }
+  #search-input { width: 140px; }
+  #search-dropdown { width: 260px; }
+  .chart-row { grid-template-columns: 1fr; }
+}
 </style>
 </head>
 <body>
 
-<div id="header">
+<!-- ── Navbar ── -->
+<div id="navbar">
   <span class="brand">SIGEOR</span>
-  <span class="sub">Geoportal de Proyectos · CNEL EP</span>
+  <span class="sub">Geoportal · CNEL EP</span>
   <span id="count" style="display:none"></span>
+
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showScreen('map')">🗺 Mapa</button>
+    <button class="nav-tab" onclick="showScreen('dashboard')">📊 Dashboard</button>
+  </div>
+
+  <div id="search-wrap">
+    <input id="search-input" type="text" placeholder="Buscar proyecto…" autocomplete="off"
+           oninput="onSearch(this.value)" onkeydown="searchKeydown(event)">
+    <span class="search-icon">🔍</span>
+    <div id="search-dropdown"></div>
+  </div>
 </div>
 
-<div id="map"></div>
+<!-- ── Map screen ── -->
+<div id="screen-map" class="screen active">
+  <div id="map"></div>
+</div>
 
+<!-- ── Dashboard screen ── -->
+<div id="screen-dashboard" class="screen" style="display:none;">
+  <div id="dashboard">
+
+    <div class="dash-grid" id="kpi-row"></div>
+
+    <div class="chart-row">
+      <div class="chart-card">
+        <div class="chart-title">Proyectos por Servicio</div>
+        <div class="chart-wrap"><canvas id="chart-servicio"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Proyectos por Año (fecha_r)</div>
+        <div class="chart-wrap"><canvas id="chart-anio"></canvas></div>
+      </div>
+    </div>
+
+    <div class="top-table-wrap">
+      <div class="chart-title">Top 15 Propietarios</div>
+      <table class="top-table" id="tbl-propietario">
+        <thead><tr><th>#</th><th>Propietario</th><th>Proyectos</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="top-table-wrap">
+      <div class="chart-title">Top 15 Fiscalizadores</div>
+      <table class="top-table" id="tbl-fiscalizador">
+        <thead><tr><th>#</th><th>Fiscalizador</th><th>Proyectos</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="dash-footer">SIGEOR · CNEL EP — datos en tiempo real desde Supabase</div>
+  </div>
+</div>
+
+<!-- ── Loader ── -->
 <div id="loader">
   <div class="spinner"></div>
   <span>Cargando proyectos…</span>
@@ -87,71 +256,250 @@ body { font-family: system-ui, -apple-system, sans-serif; }
 <div id="err-toast"></div>
 
 <script>
-// ── Configuración ───────────────────────────────────────────
+// ── Config ──────────────────────────────────────────────────
 const SUPABASE_URL = 'https://vkegcorcdiuujtwwlrqd.supabase.co';
 const ANON_KEY     = 'sb_publishable_vtdZvw10DWikrZYPpCu2HQ_OGihcKO_';
+const CAMPOS = 'id_pro,geom,codigo,nombre,servicio,propietario,fiscalizador,proyectista,fecha_r';
+const SKIP_FIELDS = ['geom','geometry','wkb_geometry','the_geom','shape','coord_x','coord_y'];
 
-// Campos a OCULTAR en el popup
-const SKIP_FIELDS  = ['geom', 'geometry', 'wkb_geometry', 'the_geom', 'shape', 'coord_x', 'coord_y'];
+// ── State ────────────────────────────────────────────────────
+let allRows = [];
+let markerIndex = {};   // id_pro → leaflet layer
+let currentScreen = 'map';
 
-// ── Mapa (centro Ecuador) ───────────────────────────────────
+// ── Map setup ────────────────────────────────────────────────
 const map = L.map('map', { zoomControl: true }).setView([-1.8, -78.2], 7);
-
 const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
+  attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
   maxZoom: 19
 });
 const sat = L.tileLayer(
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  { attribution: '© Esri, DigitalGlobe' }
+  { attribution: '© Esri' }
 );
 osm.addTo(map);
 L.control.layers({ 'Mapa base': osm, 'Satélite': sat }, {}, { position: 'topright' }).addTo(map);
 
-// ── Estilo de marcadores ────────────────────────────────────
+const cluster = L.markerClusterGroup({ chunkedLoading: true, spiderfyOnMaxZoom: true });
+
 function circleStyle() {
-  return {
-    radius: 6,
-    fillColor: '#00a651',
-    color: '#003d6b',
-    weight: 1.5,
-    opacity: 1,
-    fillOpacity: .85
-  };
+  return { radius: 6, fillColor: '#00a651', color: '#003d6b',
+           weight: 1.5, opacity: 1, fillOpacity: .85 };
 }
 
-function polyStyle() {
-  return { color: '#003d6b', weight: 1.5, fillColor: '#00a651', fillOpacity: .4 };
-}
-
-// ── Popup ───────────────────────────────────────────────────
 function buildPopup(props) {
   const entries = Object.entries(props)
     .filter(([k, v]) => !SKIP_FIELDS.includes(k.toLowerCase()) && v != null && v !== '');
-
-  // Intentar detectar un campo de nombre/título
-  const nameKey = ['nombre','name','proyecto','descripcion','titulo','id']
+  const nameKey = ['nombre','name','proyecto','descripcion','titulo']
     .find(k => props[k] != null);
   const title = nameKey ? `<div class="pup-title">${props[nameKey]}</div>` : '';
-
-  const rows = entries
-    .map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`)
-    .join('');
-
+  const rows = entries.map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
   return `${title}<div style="max-height:180px;overflow-y:auto">
     <table class="pup-table">${rows}</table></div>`;
 }
 
-// ── Cluster ─────────────────────────────────────────────────
-const cluster = L.markerClusterGroup({ chunkedLoading: true, spiderfyOnMaxZoom: true });
-
-// ── Fetch Supabase (GeoJSON nativo) ─────────────────────────
-const CAMPOS = 'id_pro,geom,codigo,nombre,servicio,propietario,fiscalizador,proyectista,fecha_r';
-fetch(`${SUPABASE_URL}/rest/v1/proyectos?select=${CAMPOS}`, {
-  headers: {
-    'apikey':        ANON_KEY,
-    'Authorization': `Bearer ${ANON_KEY}`
+// ── Screen switcher ──────────────────────────────────────────
+function showScreen(name) {
+  currentScreen = name;
+  document.querySelectorAll('.nav-tab').forEach((t,i) => {
+    t.classList.toggle('active', (i === 0 && name === 'map') || (i === 1 && name === 'dashboard'));
+  });
+  const mapEl  = document.getElementById('screen-map');
+  const dashEl = document.getElementById('screen-dashboard');
+  const mapDiv = document.getElementById('map');
+  if (name === 'map') {
+    dashEl.style.display = 'none';
+    mapEl.classList.add('active');
+    mapDiv.style.display = 'block';
+    map.invalidateSize();
+  } else {
+    mapEl.classList.remove('active');
+    mapDiv.style.display = 'none';
+    dashEl.style.display = 'block';
+    dashEl.style.display = 'block';
   }
+  // hide search dropdown on switch
+  closeDrop();
+}
+
+// ── Search ───────────────────────────────────────────────────
+let searchResults = [];
+let selIdx = -1;
+
+function onSearch(q) {
+  q = q.trim();
+  const drop = document.getElementById('search-dropdown');
+  if (!q || allRows.length === 0) { drop.style.display = 'none'; return; }
+
+  const lq = q.toLowerCase();
+  searchResults = allRows.filter(r =>
+    (r.nombre  && r.nombre.toLowerCase().includes(lq)) ||
+    (r.codigo  && r.codigo.toLowerCase().includes(lq)) ||
+    (r.servicio && r.servicio.toLowerCase().includes(lq)) ||
+    (r.propietario && r.propietario.toLowerCase().includes(lq)) ||
+    (r.id_pro && String(r.id_pro).includes(lq))
+  ).slice(0, 12);
+
+  selIdx = -1;
+  if (searchResults.length === 0) {
+    drop.innerHTML = '<div class="sd-empty">Sin resultados</div>';
+  } else {
+    drop.innerHTML = searchResults.map((r, i) => `
+      <div class="sd-item" data-idx="${i}" onclick="selectResult(${i})">
+        <div class="sd-name">${r.nombre || r.codigo || 'Proyecto ' + r.id_pro}</div>
+        <div class="sd-meta">${r.servicio || ''} · ${r.codigo || ''}</div>
+      </div>`).join('');
+  }
+  drop.style.display = 'block';
+}
+
+function selectResult(i) {
+  const r = searchResults[i];
+  if (!r || !r.geom) return;
+  closeDrop();
+  document.getElementById('search-input').value = r.nombre || r.codigo || '';
+
+  // switch to map if on dashboard
+  if (currentScreen !== 'map') showScreen('map');
+
+  const latlng = L.latLng(r.geom.coordinates[1], r.geom.coordinates[0]);
+  map.setView(latlng, 15);
+
+  const lyr = markerIndex[r.id_pro];
+  if (lyr) {
+    cluster.zoomToShowLayer(lyr, () => { lyr.openPopup(); });
+  }
+}
+
+function searchKeydown(e) {
+  const drop = document.getElementById('search-dropdown');
+  const items = drop.querySelectorAll('.sd-item');
+  if (e.key === 'ArrowDown') {
+    selIdx = Math.min(selIdx + 1, items.length - 1);
+    highlightDrop(items);
+  } else if (e.key === 'ArrowUp') {
+    selIdx = Math.max(selIdx - 1, 0);
+    highlightDrop(items);
+  } else if (e.key === 'Enter' && selIdx >= 0) {
+    selectResult(selIdx);
+  } else if (e.key === 'Escape') {
+    closeDrop();
+  }
+}
+
+function highlightDrop(items) {
+  items.forEach((el, i) => el.style.background = i === selIdx ? '#e8f0ff' : '');
+  if (items[selIdx]) items[selIdx].scrollIntoView({ block: 'nearest' });
+}
+
+function closeDrop() {
+  document.getElementById('search-dropdown').style.display = 'none';
+}
+document.addEventListener('click', e => {
+  if (!document.getElementById('search-wrap').contains(e.target)) closeDrop();
+});
+
+// ── Dashboard builder ────────────────────────────────────────
+let chartsBuilt = false;
+
+function buildDashboard(rows) {
+  if (chartsBuilt) return;
+  chartsBuilt = true;
+
+  // KPIs
+  const servicios = groupBy(rows, 'servicio');
+  const propietarios = groupBy(rows, 'propietario');
+  const anios = groupBy(rows, r => r.fecha_r ? r.fecha_r.slice(0,4) : 'Sin fecha');
+  const sinGeo = rows.filter(r => !r.geom || !r.geom.coordinates).length;
+
+  const kpis = [
+    { label: 'Total proyectos',   val: rows.length.toLocaleString(), sub: 'en la base' },
+    { label: 'Servicios únicos',  val: Object.keys(servicios).length, sub: 'tipos de servicio' },
+    { label: 'Propietarios',      val: Object.keys(propietarios).length, sub: 'únicos' },
+    { label: 'Con georreferencia',val: (rows.length - sinGeo).toLocaleString(), sub: `${sinGeo} sin coords` },
+  ];
+  const colors = ['#00a651','#003d6b','#0077c8','#e67e22'];
+  document.getElementById('kpi-row').innerHTML = kpis.map((k,i) => `
+    <div class="kpi-card" style="border-left-color:${colors[i]}">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-val">${k.val}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>`).join('');
+
+  // Chart: Proyectos por servicio
+  const srvSorted = Object.entries(servicios).sort((a,b) => b[1]-a[1]).slice(0,12);
+  new Chart(document.getElementById('chart-servicio'), {
+    type: 'bar',
+    data: {
+      labels: srvSorted.map(([k]) => k || 'Sin servicio'),
+      datasets: [{ label: 'Proyectos', data: srvSorted.map(([,v]) => v),
+        backgroundColor: '#00a651', borderRadius: 4 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { font: { size: 10 }, maxRotation: 45 } },
+        y: { beginAtZero: true, ticks: { precision: 0 } }
+      }
+    }
+  });
+
+  // Chart: por año
+  const anioSorted = Object.entries(anios)
+    .filter(([k]) => /^\d{4}$/.test(k))
+    .sort(([a],[b]) => a.localeCompare(b));
+  new Chart(document.getElementById('chart-anio'), {
+    type: 'line',
+    data: {
+      labels: anioSorted.map(([k]) => k),
+      datasets: [{
+        label: 'Proyectos', data: anioSorted.map(([,v]) => v),
+        borderColor: '#003d6b', backgroundColor: 'rgba(0,61,107,.12)',
+        fill: true, tension: 0.3, pointRadius: 4,
+        pointBackgroundColor: '#003d6b'
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  });
+
+  // Table: top propietarios
+  const propSorted = Object.entries(propietarios).sort((a,b) => b[1]-a[1]).slice(0,15);
+  const maxP = propSorted[0]?.[1] || 1;
+  document.querySelector('#tbl-propietario tbody').innerHTML =
+    propSorted.map(([k,v],i) => `<tr>
+      <td>${i+1}</td>
+      <td><span class="bar-mini" style="width:${Math.round(v/maxP*80)}px"></span>${k||'(sin dato)'}</td>
+      <td>${v}</td>
+    </tr>`).join('');
+
+  // Table: top fiscalizadores
+  const fiscSorted = Object.entries(groupBy(rows,'fiscalizador')).sort((a,b)=>b[1]-a[1]).slice(0,15);
+  const maxF = fiscSorted[0]?.[1] || 1;
+  document.querySelector('#tbl-fiscalizador tbody').innerHTML =
+    fiscSorted.map(([k,v],i) => `<tr>
+      <td>${i+1}</td>
+      <td><span class="bar-mini" style="width:${Math.round(v/maxF*80)}px"></span>${k||'(sin dato)'}</td>
+      <td>${v}</td>
+    </tr>`).join('');
+}
+
+function groupBy(rows, keyFn) {
+  const out = {};
+  rows.forEach(r => {
+    const k = typeof keyFn === 'function' ? keyFn(r) : (r[keyFn] || '');
+    out[k] = (out[k] || 0) + 1;
+  });
+  return out;
+}
+
+// ── Fetch & render ───────────────────────────────────────────
+fetch(`${SUPABASE_URL}/rest/v1/proyectos?select=${CAMPOS}`, {
+  headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` }
 })
 .then(res => {
   if (!res.ok) throw new Error(`Supabase respondió ${res.status}`);
@@ -159,13 +507,13 @@ fetch(`${SUPABASE_URL}/rest/v1/proyectos?select=${CAMPOS}`, {
 })
 .then(rows => {
   document.getElementById('loader').style.display = 'none';
+  allRows = rows;
 
-  const n = rows.length;
   const el = document.getElementById('count');
-  el.textContent = `${n.toLocaleString()} proyectos`;
+  el.textContent = `${rows.length.toLocaleString()} proyectos`;
   el.style.display = 'block';
 
-  // Construir GeoJSON limpio (sin crs) desde el JSON plano
+  // Build GeoJSON sin crs
   const geojson = {
     type: 'FeatureCollection',
     features: rows
@@ -178,8 +526,11 @@ fetch(`${SUPABASE_URL}/rest/v1/proyectos?select=${CAMPOS}`, {
   };
 
   const layer = L.geoJSON(geojson, {
-    pointToLayer: (f, ll) => L.circleMarker(ll, circleStyle()),
-    style: polyStyle,
+    pointToLayer: (f, ll) => {
+      const m = L.circleMarker(ll, circleStyle());
+      markerIndex[f.properties.id_pro] = m;
+      return m;
+    },
     onEachFeature: (f, lyr) => {
       if (f.properties) lyr.bindPopup(buildPopup(f.properties), { maxWidth: 300 });
     }
@@ -187,8 +538,10 @@ fetch(`${SUPABASE_URL}/rest/v1/proyectos?select=${CAMPOS}`, {
 
   cluster.addLayer(layer);
   map.addLayer(cluster);
+  if (rows.length > 0) map.fitBounds(cluster.getBounds(), { padding: [40, 40] });
 
-  if (n > 0) map.fitBounds(cluster.getBounds(), { padding: [40, 40] });
+  // Build dashboard in background
+  buildDashboard(rows);
 })
 .catch(err => {
   document.getElementById('loader').style.display = 'none';
