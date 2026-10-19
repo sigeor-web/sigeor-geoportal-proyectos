@@ -270,7 +270,7 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #f4f7fb; }
 // ── Config ──────────────────────────────────────────────────
 const SUPABASE_URL = 'https://vkegcorcdiuujtwwlrqd.supabase.co';
 const ANON_KEY     = 'sb_publishable_vtdZvw10DWikrZYPpCu2HQ_OGihcKO_';
-const CAMPOS = 'id_pro,geom,codigo,nombre,servicio,propietario,fiscalizador,proyectista,fecha_r,codi_alim,nom_alim,codi_sub';
+const CAMPOS = 'id_pro,geom,codigo,nombre,servicio,propietario,fiscalizador,proyectista,fecha_r,codi_alim,nom_alim,codi_sub,cod_trans,pot_inst';
 const SKIP_FIELDS = ['geom','geometry','wkb_geometry','the_geom','shape','coord_x','coord_y'];
 
 // ── State ────────────────────────────────────────────────────
@@ -418,7 +418,7 @@ function onSearch(q) {
       <div class="sd-item" data-idx="${i}" onclick="selectResult(${i})"
            style="${sinCoord ? 'opacity:.6' : ''}">
         <div class="sd-name">${r.codigo || '—'} &nbsp;<span style="font-weight:400;color:#555">${r.nombre || ''}</span></div>
-        <div class="sd-meta">${r.servicio || ''} · ${r.codi_alim ? r.codi_alim : ''}${sinCoord ? ' · <em>sin coords</em>' : ''}</div>
+        <div class="sd-meta">${r.servicio || ''}${r.cod_trans ? ' · T: ' + r.cod_trans : ''}${r.pot_inst != null ? ' · ' + r.pot_inst + ' kVA' : ''}${r.codi_alim ? ' · ' + r.codi_alim : ''}${sinCoord ? ' · <em>sin coords</em>' : ''}</div>
       </div>`;
     }).join('');
   }
