@@ -346,14 +346,28 @@ function circleStyle() {
            weight: 1.5, opacity: 1, fillOpacity: .85 };
 }
 
+// Orden y etiquetas del popup de proyectos
+const POPUP_ORDER = [
+  { key: 'codigo',      label: 'Código'         },
+  { key: 'servicio',    label: 'Servicio'        },
+  { key: 'pot_inst',    label: 'Pot. Instalada'  },
+  { key: 'cod_trafo',   label: 'Cód. Transformador' },
+  { key: 'codi_sub',    label: 'Subestación'     },
+  { key: 'nom_alim',    label: 'Alimentador'     },
+  { key: 'fiscalizador',label: 'Fiscalizador'    },
+  { key: 'proyectista', label: 'Proyectista'     },
+];
+
 function buildPopup(props) {
-  const entries = Object.entries(props)
-    .filter(([k, v]) => !SKIP_FIELDS.includes(k.toLowerCase()) && v != null && v !== '');
-  const nameKey = ['nombre','name','proyecto','descripcion','titulo']
-    .find(k => props[k] != null);
-  const title = nameKey ? `<div class="pup-title">${props[nameKey]}</div>` : '';
-  const rows = entries.map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
-  return `${title}<div style="max-height:180px;overflow-y:auto">
+  const title = props.nombre ? `<div class="pup-title">${props.nombre}</div>` : '';
+  const rows = POPUP_ORDER
+    .filter(({key}) => props[key] != null && props[key] !== '')
+    .map(({key, label}) => {
+      let val = props[key];
+      if (key === 'pot_inst') val = `${val} kVA`;
+      return `<tr><td>${label}</td><td>${val}</td></tr>`;
+    }).join('');
+  return `${title}<div style="max-height:200px;overflow-y:auto">
     <table class="pup-table">${rows}</table></div>`;
 }
 
