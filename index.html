@@ -346,6 +346,29 @@ function circleStyle() {
            weight: 1.5, opacity: 1, fillOpacity: .85 };
 }
 
+// Conversión WGS84 → UTM zona 17S (Ecuador)
+function wgs84ToUtm17S(lng, lat) {
+  const a = 6378137, f = 1/298.257223563;
+  const b = a*(1-f), e2 = 1-(b*b)/(a*a), e = Math.sqrt(e2);
+  const k0 = 0.9996, lon0 = -81 * Math.PI/180; // zona 17, meridiano central
+  const phi = lat * Math.PI/180;
+  const lam = lng * Math.PI/180;
+  const N = a / Math.sqrt(1 - e2*Math.sin(phi)**2);
+  const T = Math.tan(phi)**2;
+  const C = (e2/(1-e2)) * Math.cos(phi)**2;
+  const A = Math.cos(phi)*(lam - lon0);
+  const e4 = e2*e2, e6 = e4*e2;
+  const M = a*((1 - e2/4 - 3*e4/64 - 5*e6/256)*phi
+    - (3*e2/8 + 3*e4/32 + 45*e6/1024)*Math.sin(2*phi)
+    + (15*e4/256 + 45*e6/1024)*Math.sin(4*phi)
+    - (35*e6/3072)*Math.sin(6*phi));
+  const x = k0*N*(A + (1-T+C)*A**3/6 + (5-18*T+T**2+72*C-58*(e2/(1-e2)))*A**5/120) + 500000;
+  const y0 = lat < 0 ? 10000000 : 0;
+  const y = k0*(M + N*Math.tan(phi)*(A**2/2 + (5-T+9*C+4*C**2)*A**4/24
+    + (61-58*T+T**2+600*C-330*(e2/(1-e2)))*A**6/720)) + y0;
+  return { x: Math.round(x), y: Math.round(y) };
+}
+
 // Orden y etiquetas del popup de proyectos
 const POPUP_ORDER = [
   { key: 'codigo',      label: 'Código'         },
@@ -358,7 +381,7 @@ const POPUP_ORDER = [
   { key: 'proyectista', label: 'Proyectista'     },
 ];
 
-function buildPopup(props) {
+function buildPopup(props, coords) {
   const title = props.nombre ? `<div class="pup-title">${props.nombre}</div>` : '';
   const rows = POPUP_ORDER
     .filter(({key}) => props[key] != null && props[key] !== '')
@@ -367,8 +390,15 @@ function buildPopup(props) {
       if (key === 'pot_inst') val = `${val} kVA`;
       return `<tr><td>${label}</td><td>${val}</td></tr>`;
     }).join('');
-  return `${title}<div style="max-height:200px;overflow-y:auto">
-    <table class="pup-table">${rows}</table></div>`;
+  let utmRow = '';
+  if (coords) {
+    const utm = wgs84ToUtm17S(coords[0], coords[1]);
+    utmRow = `<tr><td>UTM Este</td><td>${utm.x.toLocaleString()}</td></tr>
+              <tr><td>UTM Norte</td><td>${utm.y.toLocaleString()}</td></tr>
+              <tr><td>Zona</td><td>17S</td></tr>`;
+  }
+  return `${title}<div style="max-height:220px;overflow-y:auto">
+    <table class="pup-table">${rows}${utmRow}</table></div>`;
 }
 
 // ── Screen switcher ──────────────────────────────────────────
@@ -699,7 +729,7 @@ fetchProyectos(CAMPOS)
       return m;
     },
     onEachFeature: (f, lyr) => {
-      if (f.properties) lyr.bindPopup(buildPopup(f.properties), { maxWidth: 300 });
+      if (f.properties) lyr.bindPopup(buildPopup(f.properties, f.geometry && f.geometry.coordinates), { maxWidth: 300 });
     }
   });
 
