@@ -289,7 +289,55 @@ const sat = L.tileLayer(
   { attribution: '© Esri' }
 );
 osm.addTo(map);
-L.control.layers({ 'Mapa base': osm, 'Satélite': sat }, {}, { position: 'topright' }).addTo(map);
+
+// ── Capa área de servicio ────────────────────────────────────
+const areaLayer = L.geoJSON(null, {
+  style: {
+    color: '#003d6b', weight: 2, opacity: .9,
+    fillColor: '#0077c8', fillOpacity: .08,
+    dashArray: '6 4'
+  },
+  onEachFeature: (f, lyr) => {
+    const p = f.properties;
+    lyr.bindPopup(
+      `<div class="pup-title">🗺 ${p.nombre || 'Área de servicio'}</div>
+       <table class="pup-table">
+         ${p.limites ? `<tr><td>Límites</td><td>${p.limites}</td></tr>` : ''}
+         ${p.area    ? `<tr><td>Área</td><td>${Number(p.area).toLocaleString()} km²</td></tr>` : ''}
+       </table>`,
+      { maxWidth: 320 }
+    );
+    lyr.on('mouseover', function(){ this.setStyle({ fillOpacity: .18 }); });
+    lyr.on('mouseout',  function(){ this.setStyle({ fillOpacity: .08 }); });
+  }
+});
+
+fetch(`${SUPABASE_URL}/rest/v1/area_Eor?select=id,geom,nombre,limites,area`, {
+  headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` }
+})
+.then(r => r.json())
+.then(rows => {
+  const geojson = {
+    type: 'FeatureCollection',
+    features: rows
+      .filter(r => r.geom && r.geom.coordinates)
+      .map(r => ({
+        type: 'Feature',
+        geometry: { type: r.geom.type, coordinates: r.geom.coordinates },
+        properties: Object.fromEntries(Object.entries(r).filter(([k]) => k !== 'geom'))
+      }))
+  };
+  areaLayer.addData(geojson);
+  areaLayer.addTo(map);
+})
+.catch(e => console.warn('area_Eor no cargó:', e));
+
+// ── Control de capas ─────────────────────────────────────────
+L.control.layers(
+  { 'Mapa base': osm, 'Satélite': sat },
+  { 'Área de servicio': areaLayer },
+  { position: 'topright' }
+).addTo(map);
 
 const cluster = L.markerClusterGroup({ chunkedLoading: true, spiderfyOnMaxZoom: true });
 
@@ -340,45 +388,69 @@ let selIdx = -1;
 function onSearch(q) {
   q = q.trim();
   const drop = document.getElementById('search-dropdown');
-  if (!q || allRows.length === 0) { drop.style.display = 'none'; return; }
+  if (q.length < 2 || allRows.length === 0) { drop.style.display = 'none'; return; }
 
-  const lq = q.toLowerCase();
-  searchResults = allRows.filter(r =>
-    (r.nombre  && r.nombre.toLowerCase().includes(lq)) ||
-    (r.codigo  && r.codigo.toLowerCase().includes(lq)) ||
-    (r.servicio && r.servicio.toLowerCase().includes(lq)) ||
-    (r.propietario && r.propietario.toLowerCase().includes(lq)) ||
-    (r.id_pro && String(r.id_pro).includes(lq))
-  ).slice(0, 12);
+  const lq = q.toLowerCase().replace(/\s+/g, ' ');
+  searchResults = allRows.filter(r => {
+    const cod  = String(r.codigo  || '').toLowerCase().trim();
+    const nom  = String(r.nombre  || '').toLowerCase().trim();
+    const srv  = String(r.servicio|| '').toLowerCase().trim();
+    const prop = String(r.propietario||'').toLowerCase().trim();
+    const id   = String(r.id_pro  || '');
+    return cod.includes(lq) || nom.includes(lq) ||
+           srv.includes(lq) || prop.includes(lq) || id === lq;
+  })
+  // primero los que coinciden por código exacto al inicio
+  .sort((a, b) => {
+    const ac = String(a.codigo||'').toLowerCase().startsWith(lq) ? 0 : 1;
+    const bc = String(b.codigo||'').toLowerCase().startsWith(lq) ? 0 : 1;
+    return ac - bc;
+  })
+  .slice(0, 15);
 
   selIdx = -1;
   if (searchResults.length === 0) {
-    drop.innerHTML = '<div class="sd-empty">Sin resultados</div>';
+    drop.innerHTML = '<div class="sd-empty">Sin resultados para <strong>' + q + '</strong></div>';
   } else {
-    drop.innerHTML = searchResults.map((r, i) => `
-      <div class="sd-item" data-idx="${i}" onclick="selectResult(${i})">
-        <div class="sd-name">${r.nombre || r.codigo || 'Proyecto ' + r.id_pro}</div>
-        <div class="sd-meta">${r.servicio || ''} · ${r.codigo || ''}</div>
-      </div>`).join('');
+    drop.innerHTML = searchResults.map((r, i) => {
+      const sinCoord = !r.geom || !r.geom.coordinates;
+      return `
+      <div class="sd-item" data-idx="${i}" onclick="selectResult(${i})"
+           style="${sinCoord ? 'opacity:.6' : ''}">
+        <div class="sd-name">${r.codigo || '—'} &nbsp;<span style="font-weight:400;color:#555">${r.nombre || ''}</span></div>
+        <div class="sd-meta">${r.servicio || ''} · ${r.codi_alim ? r.codi_alim : ''}${sinCoord ? ' · <em>sin coords</em>' : ''}</div>
+      </div>`;
+    }).join('');
   }
   drop.style.display = 'block';
 }
 
 function selectResult(i) {
   const r = searchResults[i];
-  if (!r || !r.geom) return;
+  if (!r) return;
   closeDrop();
-  document.getElementById('search-input').value = r.nombre || r.codigo || '';
+  document.getElementById('search-input').value = r.codigo || r.nombre || '';
 
-  // switch to map if on dashboard
   if (currentScreen !== 'map') showScreen('map');
 
-  const latlng = L.latLng(r.geom.coordinates[1], r.geom.coordinates[0]);
-  map.setView(latlng, 15);
+  if (!r.geom || !r.geom.coordinates) {
+    const toast = document.getElementById('err-toast');
+    toast.style.background = '#e67e22';
+    toast.textContent = `"${r.codigo || r.nombre}" no tiene coordenadas registradas`;
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 3500);
+    return;
+  }
 
+  const latlng = L.latLng(r.geom.coordinates[1], r.geom.coordinates[0]);
   const lyr = markerIndex[r.id_pro];
   if (lyr) {
-    cluster.zoomToShowLayer(lyr, () => { lyr.openPopup(); });
+    cluster.zoomToShowLayer(lyr, () => {
+      map.setView(latlng, 16);
+      lyr.openPopup();
+    });
+  } else {
+    map.setView(latlng, 16);
   }
 }
 
