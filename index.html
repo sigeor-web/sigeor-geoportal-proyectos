@@ -270,7 +270,7 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #f4f7fb; }
 // ── Config ──────────────────────────────────────────────────
 const SUPABASE_URL = 'https://vkegcorcdiuujtwwlrqd.supabase.co';
 const ANON_KEY     = 'sb_publishable_vtdZvw10DWikrZYPpCu2HQ_OGihcKO_';
-const CAMPOS = 'id_pro,geom,codigo,nombre,servicio,propietario,fiscalizador,proyectista,fecha_r,codi_alim,nom_alim,codi_sub,cod_trans,pot_inst';
+const CAMPOS = 'id_pro,geom,codigo,nombre,servicio,propietario,fiscalizador,proyectista,fecha_r,codi_alim,nom_alim,codi_sub,cod_trafo,pot_inst';
 const SKIP_FIELDS = ['geom','geometry','wkb_geometry','the_geom','shape','coord_x','coord_y'];
 
 // ── State ────────────────────────────────────────────────────
@@ -418,7 +418,7 @@ function onSearch(q) {
       <div class="sd-item" data-idx="${i}" onclick="selectResult(${i})"
            style="${sinCoord ? 'opacity:.6' : ''}">
         <div class="sd-name">${r.codigo || '—'} &nbsp;<span style="font-weight:400;color:#555">${r.nombre || ''}</span></div>
-        <div class="sd-meta">${r.servicio || ''}${r.cod_trans ? ' · T: ' + r.cod_trans : ''}${r.pot_inst != null ? ' · ' + r.pot_inst + ' kVA' : ''}${r.codi_alim ? ' · ' + r.codi_alim : ''}${sinCoord ? ' · <em>sin coords</em>' : ''}</div>
+        <div class="sd-meta">${r.servicio || ''}${r.cod_trafo ? ' · T: ' + r.cod_trafo : ''}${r.pot_inst != null ? ' · ' + r.pot_inst + ' kVA' : ''}${r.codi_alim ? ' · ' + r.codi_alim : ''}${sinCoord ? ' · <em>sin coords</em>' : ''}</div>
       </div>`;
     }).join('');
   }
@@ -639,13 +639,25 @@ function groupBy(rows, keyFn) {
 }
 
 // ── Fetch & render ───────────────────────────────────────────
-fetch(`${SUPABASE_URL}/rest/v1/proyectos?select=${CAMPOS}`, {
-  headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` }
-})
-.then(res => {
-  if (!res.ok) throw new Error(`Supabase respondió ${res.status}`);
-  return res.json();
-})
+const CAMPOS_BASE = 'id_pro,geom,codigo,nombre,servicio,propietario,fiscalizador,proyectista,fecha_r,codi_alim,nom_alim,codi_sub';
+
+function fetchProyectos(campos) {
+  return fetch(`${SUPABASE_URL}/rest/v1/proyectos?select=${campos}`, {
+    headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` }
+  }).then(res => {
+    if (!res.ok) {
+      // Si falla con los campos opcionales, reintenta sin ellos
+      if (campos !== CAMPOS_BASE) {
+        console.warn(`Campos opcionales no disponibles (${res.status}), reintentando sin cod_trafo/pot_inst`);
+        return fetchProyectos(CAMPOS_BASE);
+      }
+      throw new Error(`Supabase respondió ${res.status}`);
+    }
+    return res.json();
+  });
+}
+
+fetchProyectos(CAMPOS)
 .then(rows => {
   document.getElementById('loader').style.display = 'none';
   allRows = rows;
