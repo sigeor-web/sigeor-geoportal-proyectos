@@ -1,3 +1,4 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -528,6 +529,23 @@ document.addEventListener('click', e => {
 
 // ── Dashboard builder ────────────────────────────────────────
 let chartsBuilt = false;
+let alimentadoresLookup = {}; // cod_alim → nombre completo
+let allRowsForDash = null;    // proyectos en espera si lookup aún no llegó
+
+// Fetch tabla alimentadores para lookup de nombres
+fetch(`${SUPABASE_URL}/rest/v1/alimentadores?select=cod_alim,alimentador`, {
+  headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` }
+}).then(r => r.ok ? r.json() : [])
+  .then(data => {
+    data.forEach(r => { if (r.cod_alim) alimentadoresLookup[r.cod_alim.trim()] = r.alimentador || r.cod_alim; });
+    if (allRowsForDash) buildDashboard(allRowsForDash); // construir ahora si proyectos ya llegaron
+  }).catch(() => { if (allRowsForDash) buildDashboard(allRowsForDash); });
+
+function nombreAlim(r) {
+  const cod = (r.codi_alim || '').trim();
+  if (alimentadoresLookup[cod]) return alimentadoresLookup[cod];
+  return r.nom_alim ? `${cod} · ${r.nom_alim}` : (cod || '');
+}
 
 function buildDashboard(rows) {
   if (chartsBuilt) return;
@@ -536,7 +554,7 @@ function buildDashboard(rows) {
   const servicios    = groupBy(rows, 'servicio');
   const proyectistas = groupBy(rows, 'proyectista');
   const subestaciones= groupBy(rows, 'codi_sub');
-  const alimentadores= groupBy(rows, r => r.nom_alim ? `${r.codi_alim||''} · ${r.nom_alim}` : (r.codi_alim||''));
+  const alimentadores= groupBy(rows, r => nombreAlim(r));
   const anios        = groupBy(rows, r => r.fecha_r ? r.fecha_r.slice(0,4) : '');
   const sinGeo       = rows.filter(r => !r.geom || !r.geom.coordinates).length;
 
@@ -737,8 +755,9 @@ fetchProyectos(CAMPOS)
   map.addLayer(cluster);
   if (rows.length > 0) map.fitBounds(cluster.getBounds(), { padding: [40, 40] });
 
-  // Build dashboard in background
-  buildDashboard(rows);
+  // Build dashboard — esperar lookup de alimentadores si aún no llegó
+  allRowsForDash = rows;
+  if (Object.keys(alimentadoresLookup).length > 0) buildDashboard(rows);
 })
 .catch(err => {
   document.getElementById('loader').style.display = 'none';
@@ -750,3 +769,5 @@ fetchProyectos(CAMPOS)
 </script>
 </body>
 </html>
+
+</body></html>
